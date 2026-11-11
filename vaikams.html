@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="lt"><head><meta charset="utf-8"><title>Filmukai</title>
+<style>
+:root{--bg:#10163a;--tile:#1c2457;--focus:#ffd23f}
+html,body{margin:0;min-height:100%;background:var(--bg);color:#fff;font-family:Arial,Helvetica,sans-serif}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:2.5vh 4vw;background:linear-gradient(var(--bg) 70%,transparent)}
+h1{margin:0;font-size:5vh}
+#clock{padding:1vh 2vw;border-radius:2vh;background:rgba(0,0,0,.45);font-size:5vh;font-weight:bold;text-align:center}
+#clock small{display:block;font-size:2vh;font-weight:normal;opacity:.8}
+#clock.low,#wclock.low{background:#b42828}
+.grid{display:grid;gap:3vh 2vw;padding:1vh 4vw 6vh}
+#home{grid-template-columns:repeat(2,38vw);justify-content:center;gap:5vh 4vw;padding-top:8vh}
+#list{grid-template-columns:repeat(4,1fr)}
+.t{position:relative;border:0;padding:0;border-radius:2.4vh;overflow:hidden;background:var(--tile);color:#fff;cursor:pointer;outline:none;transition:transform .12s;font:inherit}
+.t:focus,.t:hover{transform:scale(1.06);box-shadow:0 0 0 .8vh var(--focus)}
+.v{aspect-ratio:16/9}
+.v img{width:100%;height:100%;object-fit:cover;display:block}
+.v span{position:absolute;left:0;right:0;bottom:0;padding:3vh 1vw 1vh;font-size:2.1vh;text-align:left;background:linear-gradient(transparent,rgba(0,0,0,.85));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c{display:flex;flex-direction:column;align-items:center;gap:2.5vh;padding:4vh 1vw}
+.c img{width:22vh;height:22vh;border-radius:50%;object-fit:cover;background:#fff}
+.c b{font-size:4vh}
+.bad{display:none}
+#watch{display:none;position:fixed;inset:0;background:#000;z-index:20}
+#wclock{position:fixed;top:3vh;right:3vw;z-index:21;padding:1vh 2vw;border-radius:2vh;background:rgba(0,0,0,.6);font-size:5vh;font-weight:bold;display:none}
+#end{display:none;position:fixed;inset:0;background:var(--bg);z-index:30;align-items:center;justify-content:center;flex-direction:column;font-size:9vh}
+#end div{font-size:4vh;opacity:.7;margin-top:2vh}
+</style></head><body>
+<header><h1 id="title">Rinkis filmuką 📺</h1><div id="clock"><small>Liko laiko</small><span class="left">--:--</span></div></header>
+<div id="home" class="grid"></div>
+<div id="list" class="grid" style="display:none"></div>
+<div id="watch"><div id="player"></div></div>
+<div id="wclock"><span class="left">--:--</span></div>
+<div id="end">Laikas baigėsi 🌙<div>Iki kito karto!</div></div>
+<script>
+var q=new URLSearchParams(location.search);
+var endAt=Number(q.get('until'))||Date.now()+Number(q.get('min')||30)*60000;
+var home=document.getElementById('home'),list=document.getElementById('list'),watch=document.getElementById('watch'),wclock=document.getElementById('wclock'),title=document.getElementById('title');
+var channels=[],chan=-1,current=-1,player,ready=false,pending=null,done=false,lastChan=0;
+function el(tag,cls,html){var e=document.createElement(tag);e.className=cls;e.innerHTML=html;return e}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function fmt(ms){var s=Math.max(0,Math.ceil(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s%3600/60),r=String(s%60).padStart(2,'0');return h?h+':'+String(m).padStart(2,'0')+':'+r:m+':'+r}
+function tick(){var l=endAt-Date.now(),low=l<60000?'low':'';[].forEach.call(document.querySelectorAll('.left'),function(e){e.textContent=fmt(l)});document.getElementById('clock').className=low;wclock.className=low;if(l<=0&&!done)finish()}
+function finish(){done=true;try{player.stopVideo()}catch(e){}watch.style.display='none';wclock.style.display='none';document.getElementById('end').style.display='flex'}
+setInterval(tick,500);tick();
+function tiles(box){return [].slice.call(box.children).filter(function(t){return !t.classList.contains('bad')})}
+function showHome(){chan=-1;list.style.display='none';home.style.display='grid';title.textContent='Rinkis filmuką 📺';var t=tiles(home)[lastChan]||tiles(home)[0];if(t)t.focus();scrollTo(0,0)}
+function showList(i,focus){chan=i;lastChan=i;home.style.display='none';list.style.display='grid';title.textContent=channels[i].name;list.innerHTML='';
+channels[i].videos.forEach(function(v,k){var b=el('button','t v','<img src="https://i.ytimg.com/vi/'+v.id+'/hqdefault.jpg" alt=""><span>'+esc(v.title)+'</span>');b.dataset.k=k;b.onclick=function(){play(k)};list.appendChild(b)});
+var t=list.children[focus||0];if(t)t.focus();scrollTo(0,0)}
+function openChannel(i){history.pushState({v:'list',c:i},'');showList(i)}
+function play(k){if(done)return;current=k;watch.style.display='block';wclock.style.display='block';history.pushState({v:'watch',c:chan,k:k},'');var id=channels[chan].videos[k].id;if(ready)player.loadVideoById(id);else pending=id}
+function closeWatch(){try{player.stopVideo()}catch(e){}watch.style.display='none';wclock.style.display='none'}
+window.onpopstate=function(e){var s=e.state||{};if(s.v==='list'){closeWatch();if(chan!==s.c)showList(s.c);var t=list.children[current];if(t)t.focus()}else{closeWatch();showHome()}};
+document.addEventListener('keydown',function(e){if(done||watch.style.display==='block')return;var box=chan<0?home:list,cols=chan<0?2:4,v=tiles(box),k=v.indexOf(document.activeElement);var n={37:-1,39:1,38:-cols,40:cols}[e.keyCode];if(n===undefined)return;e.preventDefault();var j=k<0?0:Math.max(0,Math.min(v.length-1,k+n));v[j].focus();v[j].scrollIntoView({block:'center',behavior:'smooth'})});
+function nextVideo(){var v=tiles(list),k=v.indexOf(list.children[current]);if(k>=0&&k+1<v.length){history.replaceState({v:'list',c:chan},'');play(+v[k+1].dataset.k)}else history.back()}
+function onYouTubeIframeAPIReady(){player=new YT.Player('player',{width:'100%',height:'100%',playerVars:{autoplay:1,rel:0,playsinline:1,fs:0},events:{
+onReady:function(){ready=true;if(pending){player.loadVideoById(pending);pending=null}},
+onStateChange:function(e){if(e.data===0&&!done)nextVideo()},
+onError:function(){var t=list.children[current];if(t)t.classList.add('bad');history.back()}}})}
+fetch('videos.json',{cache:'no-cache'}).then(function(r){return r.json()}).then(function(d){channels=d;
+d.forEach(function(c,i){var b=el('button','t c','<img src="'+esc(c.avatar)+'" alt=""><b>'+esc(c.name)+'</b>');b.onclick=function(){openChannel(i)};home.appendChild(b)});
+history.replaceState({v:'home'},'');showHome()});
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body></html>

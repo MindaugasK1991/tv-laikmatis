@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="lt"><head><meta charset="utf-8"><meta name="referrer" content="strict-origin-when-cross-origin"><title>TV laikmatis</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:Arial,Helvetica,sans-serif}
+#player{position:fixed;inset:0;width:100vw;height:100vh}
+#clock{position:fixed;top:3vh;right:3vw;padding:1.2vh 2vw;border-radius:2vh;background:rgba(0,0,0,.6);color:#fff;font-size:6vh;font-weight:bold;z-index:5;text-align:center}
+#clock small{display:block;font-size:2.4vh;font-weight:normal;opacity:.8}
+#clock.low{background:rgba(180,40,40,.75)}
+#end{display:none;position:fixed;inset:0;background:#0b1026;color:#fff;z-index:10;align-items:center;justify-content:center;flex-direction:column;font-size:9vh}
+#end div{font-size:4vh;opacity:.7;margin-top:2vh}
+</style></head><body>
+<div id="player"></div>
+<div id="clock"><small>Liko laiko</small><span id="left">--:--</span></div>
+<div id="end">Laikas baigėsi 🌙<div>Iki kito karto!</div></div>
+<script>
+var q=new URLSearchParams(location.search);
+var ids=(q.get('v')||'').split(',').filter(Boolean);
+var list=q.get('list');
+var endAt=Number(q.get('until'))||Date.now()+Number(q.get('min')||30)*60000;
+var player,done=false,fails=0,shuffled=false;
+function fmt(ms){var s=Math.max(0,Math.ceil(ms/1000)),h=Math.floor(s/3600),m=Math.floor(s%3600/60),r=String(s%60).padStart(2,'0');return h?h+':'+String(m).padStart(2,'0')+':'+r:m+':'+r}
+function finish(){done=true;try{player.stopVideo()}catch(e){}document.getElementById('end').style.display='flex';document.getElementById('clock').style.display='none'}
+function tick(){var l=endAt-Date.now();document.getElementById('left').textContent=fmt(l);document.getElementById('clock').className=l<60000?'low':'';if(l<=0&&!done)finish()}
+setInterval(tick,500);tick();
+function start(p){if(list)p.cuePlaylist({listType:'playlist',list:list});else if(ids.length)p.cuePlaylist(ids)}
+function begin(p){shuffled=true;p.setLoop(true);if(list&&q.get('shuffle')!=='0')p.setShuffle(true);p.playVideoAt(0)}
+function onYouTubeIframeAPIReady(){player=new YT.Player('player',{width:'100%',height:'100%',playerVars:{autoplay:1,controls:0,rel:0,playsinline:1},events:{
+onReady:function(e){start(e.target)},
+onStateChange:function(e){if(e.data===5&&!shuffled)begin(e.target);if(e.data===1)fails=0},
+onError:function(){if(++fails<20&&!done)player.nextVideo()}}})}
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body></html>
